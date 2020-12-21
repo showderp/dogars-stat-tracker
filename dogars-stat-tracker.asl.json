@@ -1,0 +1,162 @@
+{
+  "StartAt": "Check Existing Users",
+  "States": {
+    "Check Existing Users": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.users",
+          "IsPresent": true,
+          "Next": "Process Users"
+        }
+      ],
+      "Default": "Get All Users"
+    },
+    "Get All Users": {
+      "Type": "Task",
+      "Resource": "${GetAllUsersFunctionArn}",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "IntervalSeconds": 15,
+          "MaxAttempts": 5,
+          "BackoffRate": 1.5
+        }
+      ],
+      "ResultPath": "$.users",
+      "Next": "Process Users"
+    },
+    "Process Users": {
+      "Type": "Map",
+      "ItemsPath": "$.users",
+      "Iterator": {
+        "StartAt": "Process User",
+        "States": {
+          "Process User": {
+            "Type": "Map",
+            "ItemsPath": "$.showdownIds",
+            "Iterator": {
+              "StartAt": "GetShowdownUserBattleStats",
+              "States": {
+                "GetShowdownUserBattleStats": {
+                  "Type": "Task",
+                  "Resource": "${GetShowdownUserBattleStatsFunctionArn}",
+                  "Parameters": {
+                    "showdownId.$": "$",
+                    "rangeEnd.$": "$$.Execution.StartTime",
+                    "rangeSize": "${RangeSize}"
+                  },
+                  "Retry": [
+                    {
+                      "ErrorEquals": [
+                        "States.TaskFailed"
+                      ],
+                      "IntervalSeconds": 2,
+                      "MaxAttempts": 3,
+                      "BackoffRate": 1
+                    }
+                  ],
+                  "End": true
+                }
+              }
+            },
+            "ResultPath": "$.battleStatsList",
+            "Next": "Combine All Showdown User Battle Stats"
+          },
+          "Combine All Showdown User Battle Stats": {
+            "Type": "Task",
+            "Resource": "${CombineAllShowdownUserBattleStatsFunctionArn}",
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "States.TaskFailed"
+                ],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 3,
+                "BackoffRate": 1
+              }
+            ],
+            "ResultPath": "$.battleStats",
+            "Next": "Update User Role"
+          },
+          "Update User Role": {
+            "Type": "Task",
+            "Resource": "${UpdateUserRoleFunctionArn}",
+            "Parameters": {
+              "user.$": "$",
+              "battleStats.$": "$.battleStats"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "States.TaskFailed"
+                ],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 3,
+                "BackoffRate": 1
+              }
+            ],
+            "ResultPath": "$.updateResult",
+            "Next": "Map User"
+          },
+          "Map User": {
+            "Type": "Choice",
+            "Choices": [
+              {
+                "Or": [
+                  {
+                    "Variable": "$.updateResult.activeStatusChanged",
+                    "BooleanEquals": true
+                  },
+                  {
+                    "Variable": "$.updateResult.champStatusChanged",
+                    "BooleanEquals": true
+                  }
+                ],
+                "Next": "Update User"
+              }
+            ],
+            "Default": "End State"
+          },
+          "Update User": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:updateItem",
+            "Parameters": {
+              "TableName": "${UserTable}",
+              "Key": {
+                "discordId": { "S.$": "$.discordId" }
+              },
+              "UpdateExpression": "set isActive = :isActive, isChamp = :isChamp",
+              "ExpressionAttributeValues": {
+                ":isActive": {
+                  "BOOL.$": "$.updateResult.isActive"
+                },
+                ":isChamp": {
+                  "BOOL.$": "$.updateResult.isChamp"
+                }
+              }
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "States.TaskFailed"
+                ],
+                "IntervalSeconds": 20,
+                "MaxAttempts": 5,
+                "BackoffRate": 10
+              }
+            ],
+            "End": true
+          },
+          "End State": {
+            "Type": "Pass",
+            "End": true
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}

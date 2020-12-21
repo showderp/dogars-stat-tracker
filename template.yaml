@@ -1,0 +1,106 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  Rate:
+    Type: String
+    Default: 3 hours
+  UserTableName:
+    Type: String
+    Default: Users
+  BattleTableName:
+    Type: String
+    Default: Battles
+  BattleTableShowdownIdBattleStartTimeIndexName:
+    Type: String
+    Default: showdownId-battleStartTime-index
+  RangeSize:
+    Type: Number
+    Default: 1209600000 # 2 weeks
+  BotToken:
+    Type: String
+  Guild:
+    Type: String
+  ActiveRole:
+    Type: String
+  ChampRole:
+    Type: String
+  ActiveThreshold:
+    Type: Number
+    Default: 10
+  ChampThreshold:
+    Type: Number
+    Default: 10
+Resources:
+  DogarsStatTrackerStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: dogars-stat-tracker.asl.json
+      DefinitionSubstitutions:
+        GetAllUsersFunctionArn: !GetAtt GetAllUsersFunctionArn.Arn
+        GetShowdownUserBattleStatsFunctionArn: !GetAtt GetShowdownUserBattleStatsFunction.Arn
+        CombineAllShowdownUserBattleStatsFunctionArn: !GetAtt CombineAllShowdownUserBattleStatsFunction.Arn
+        UpdateUserRoleFunctionArn: !GetAtt UpdateUserRoleFunction.Arn
+        UserTable: !Ref UserTableName
+        RangeSize: !Ref RangeSize
+      Events:
+        Schedule:
+          Type: Schedule
+          Properties:
+            Schedule: !Sub 'rate(${Rate})'
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref GetAllUsersFunctionArn
+        - LambdaInvokePolicy:
+            FunctionName: !Ref GetShowdownUserBattleStatsFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref CombineAllShowdownUserBattleStatsFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref UpdateUserRoleFunction
+        - DynamoDBWritePolicy:
+            TableName: !Ref UserTableName
+
+  GetAllUsersFunctionArn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/handlers/get-all-users.handler
+      Runtime: nodejs12.x
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UserTableName
+      Environment:
+        Variables:
+          USER_TABLE_NAME: !Ref UserTableName
+
+  GetShowdownUserBattleStatsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/handlers/get-showdown-user-battle-stats.handler
+      Runtime: nodejs12.x
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref BattleTableName
+      Environment:
+        Variables:
+          BATTLE_TABLE_NAME: !Ref BattleTableName
+          BATTLE_TABLE_INDEX: !Ref BattleTableShowdownIdBattleStartTimeIndexName
+          RANGE_SIZE: !Ref RangeSize
+
+  CombineAllShowdownUserBattleStatsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/handlers/combine-all-showdown-user-battle-stats.handler
+      Runtime: nodejs12.x
+
+  UpdateUserRoleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/handlers/update-user-role.handler
+      Runtime: nodejs12.x
+      Environment:
+        Variables:
+          BOT_TOKEN: !Ref BotToken
+          GUILD_ID: !Ref Guild
+          ACTIVE_ROLE_ID: !Ref ActiveRole
+          CHAMP_ROLE_ID: !Ref ChampRole
+          ACTIVE_THRESHOLD: !Ref ActiveThreshold
+          CHAMP_THRESHOLD: !Ref ChampThreshold
