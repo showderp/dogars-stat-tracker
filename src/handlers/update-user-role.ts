@@ -29,17 +29,17 @@ const modifyRole = async (addRole: boolean, id: string, role: string) => {
 export const handler: Handler<UpdateUserRoleRequest, UpdateUserRoleResponse> = async (request) => {
   const promises: Promise<void>[] = [];
 
-  if ((request.battleStats.totalBattles > activeThreshold) !== request.user.isActive) {
+  if ((request.battleStats.totalBattles >= activeThreshold) !== request.user.isActive) {
     promises.push(modifyRole(
-      request.battleStats.totalBattles > activeThreshold,
+      request.battleStats.totalBattles >= activeThreshold,
       request.user.discordId,
       activeRole,
     ));
   }
 
-  if ((request.battleStats.totalChampBattles > champThreshold) !== request.user.isChamp) {
+  if ((request.battleStats.totalChampBattles >= champThreshold) !== request.user.isChamp) {
     promises.push(modifyRole(
-      request.battleStats.totalChampBattles > champThreshold,
+      request.battleStats.totalChampBattles >= champThreshold,
       request.user.discordId,
       champRole,
     ));

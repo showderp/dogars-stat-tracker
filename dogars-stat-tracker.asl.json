@@ -99,26 +99,7 @@
               }
             ],
             "ResultPath": "$.updateResult",
-            "Next": "Map User"
-          },
-          "Map User": {
-            "Type": "Choice",
-            "Choices": [
-              {
-                "Or": [
-                  {
-                    "Variable": "$.updateResult.activeStatusChanged",
-                    "BooleanEquals": true
-                  },
-                  {
-                    "Variable": "$.updateResult.champStatusChanged",
-                    "BooleanEquals": true
-                  }
-                ],
-                "Next": "Update User"
-              }
-            ],
-            "Default": "End State"
+            "Next": "Update User"
           },
           "Update User": {
             "Type": "Task",
@@ -128,13 +109,19 @@
               "Key": {
                 "discordId": { "S.$": "$.discordId" }
               },
-              "UpdateExpression": "set isActive = :isActive, isChamp = :isChamp",
+              "UpdateExpression": "set isActive = :isActive, isChamp = :isChamp, battles = :battles, champBattles = :champBattles",
               "ExpressionAttributeValues": {
                 ":isActive": {
                   "BOOL.$": "$.updateResult.isActive"
                 },
                 ":isChamp": {
                   "BOOL.$": "$.updateResult.isChamp"
+                },
+                ":battles": {
+                  "N.$": "States.JsonToString($.battleStats.totalBattles)"
+                },
+                ":champBattles": {
+                  "N.$": "States.JsonToString($.battleStats.totalChampBattles)"
                 }
               }
             },
@@ -148,10 +135,6 @@
                 "BackoffRate": 10
               }
             ],
-            "End": true
-          },
-          "End State": {
-            "Type": "Pass",
             "End": true
           }
         }
