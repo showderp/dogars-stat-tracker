@@ -48,9 +48,9 @@ export const handler: Handler<UpdateUserRoleRequest, UpdateUserRoleResponse> = a
   await Promise.all(promises);
 
   return {
-    isActive: request.battleStats.totalBattles > activeThreshold,
-    activeStatusChanged: (request.battleStats.totalBattles > activeThreshold) !== request.user.isActive,
-    isChamp: request.battleStats.totalChampBattles > champThreshold,
-    champStatusChanged: (request.battleStats.totalChampBattles > champThreshold) !== request.user.isChamp,
+    isActive: request.battleStats.totalBattles >= activeThreshold,
+    activeStatusChanged: (request.battleStats.totalBattles >= activeThreshold) !== request.user.isActive,
+    isChamp: request.battleStats.totalChampBattles >= champThreshold,
+    champStatusChanged: (request.battleStats.totalChampBattles >= champThreshold) !== request.user.isChamp,
   };
 };
